@@ -347,10 +347,6 @@ export default function StudySet() {
         )}
       </div>
 
-      <button className="fab" onClick={handleAddWord} aria-label="단어 추가">
-        <Plus size={24} />
-      </button>
-
       <WordModal isOpen={modalOpen} onClose={() => { setModalOpen(false); setEditWord(null); }} onSave={handleSaveWord} editWord={editWord} />
     </div>
   );

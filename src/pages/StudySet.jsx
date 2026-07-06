@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Plus, ChevronLeft, ChevronRight, X as XIcon, Circle as CircleIcon } from 'lucide-react';
+import { ArrowLeft, Plus, ChevronLeft, ChevronRight, X as XIcon, Circle as CircleIcon, RefreshCw } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
 import { useAuth } from '../contexts/AuthContext';
 import WordCard from '../components/WordCard';
@@ -16,8 +16,13 @@ export default function StudySet() {
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [editWord, setEditWord] = useState(null);
+  
+  // Flashcard Queue States
+  const [studyQueue, setStudyQueue] = useState([]);
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [filter, setFilter] = useState('all');
+  const [filter, setFilter] = useState('all'); // all, learning, mastered
+  const [isRoundComplete, setIsRoundComplete] = useState(false);
+  
   const [toast, setToast] = useState(null);
 
   const loadWords = useCallback(async () => {
@@ -43,6 +48,40 @@ export default function StudySet() {
   const showToast = (message, type = 'success') => {
     setToast({ message, type });
     setTimeout(() => setToast(null), 2500);
+  };
+
+  // Build the queue when filter changes or on initial load
+  useEffect(() => {
+    if (words.length > 0) {
+      startRound(filter);
+    } else {
+      setStudyQueue([]);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filter, words.length]); // Don't trigger when `words` objects mutate (e.g. is_mastered flips)
+
+  const startRound = (targetFilter, customQueue = null) => {
+    setIsRoundComplete(false);
+    setCurrentIndex(0);
+    
+    if (customQueue) {
+      setStudyQueue(customQueue);
+      return;
+    }
+
+    let newQueue = [];
+    if (targetFilter === 'learning') newQueue = words.filter(w => !w.is_mastered);
+    else if (targetFilter === 'mastered') newQueue = words.filter(w => w.is_mastered);
+    else newQueue = [...words];
+
+    setStudyQueue(newQueue);
+  };
+
+  const handleShuffleRestudy = () => {
+    const unmastered = words.filter(w => !w.is_mastered);
+    const shuffled = [...unmastered].sort(() => Math.random() - 0.5);
+    setFilter('learning');
+    startRound('learning', shuffled);
   };
 
   const handleSaveWord = async (wordData) => {
@@ -85,14 +124,8 @@ export default function StudySet() {
       .eq('id', id);
 
     if (!error) {
-      setWords(prev =>
-        prev.map(w => w.id === id ? { ...w, is_mastered: mastered } : w)
-          .sort((a, b) => {
-            if (a.is_mastered !== b.is_mastered) return a.is_mastered ? 1 : -1;
-            return new Date(b.created_at) - new Date(a.created_at);
-          })
-      );
-      if (mastered) showToast('암기 완료! 👏');
+      // Update local words state to reflect DB changes immediately for counts and next round
+      setWords(prev => prev.map(w => w.id === id ? { ...w, is_mastered: mastered } : w));
     }
   };
 
@@ -108,6 +141,30 @@ export default function StudySet() {
     }
   };
 
+  const handleMark = async (mastered) => {
+    if (studyQueue.length === 0 || isRoundComplete) return;
+    
+    const currentWord = studyQueue[currentIndex];
+    
+    // Optimistic UI for toggle
+    await handleToggleMastered(currentWord.id, mastered);
+    
+    // Advance to next card
+    if (currentIndex < studyQueue.length - 1) {
+      setCurrentIndex(prev => prev + 1);
+    } else {
+      setIsRoundComplete(true);
+    }
+  };
+
+  const handlePrev = () => {
+    if (currentIndex > 0) setCurrentIndex(currentIndex - 1);
+  };
+
+  const handleNext = () => {
+    if (currentIndex < studyQueue.length - 1) setCurrentIndex(currentIndex + 1);
+  };
+
   const handleEditWord = (word) => {
     setEditWord(word);
     setModalOpen(true);
@@ -116,27 +173,6 @@ export default function StudySet() {
   const handleAddWord = () => {
     setEditWord(null);
     setModalOpen(true);
-  };
-
-  const filteredWords = words.filter(w => {
-    if (filter === 'learning') return !w.is_mastered;
-    if (filter === 'mastered') return w.is_mastered;
-    return true;
-  });
-
-  // Ensure currentIndex is valid if filteredWords changes
-  useEffect(() => {
-    if (currentIndex >= filteredWords.length && filteredWords.length > 0) {
-      setCurrentIndex(filteredWords.length - 1);
-    }
-  }, [filteredWords.length, currentIndex]);
-
-  const handlePrev = () => {
-    if (currentIndex > 0) setCurrentIndex(currentIndex - 1);
-  };
-
-  const handleNext = () => {
-    if (currentIndex < filteredWords.length - 1) setCurrentIndex(currentIndex + 1);
   };
 
   const learningCount = words.filter(w => !w.is_mastered).length;
@@ -200,20 +236,50 @@ export default function StudySet() {
 
       {/* Navigation and Single Flashcard View */}
       <div className="flashcard-container" style={{ padding: '0 20px', flex: 1, display: 'flex', flexDirection: 'column', gap: '20px', alignItems: 'stretch' }}>
-        {filteredWords.length === 0 ? (
+        {studyQueue.length === 0 ? (
           <div className="word-list-empty" style={{ margin: 'auto' }}>
             <div className="word-list-empty-icon">📝</div>
             <h3>단어가 없습니다</h3>
             <p>조건에 맞는 단어가 없거나 비어 있습니다.</p>
           </div>
+        ) : isRoundComplete ? (
+          <div className="word-card glass" style={{ margin: 'auto', padding: '40px 20px', textAlign: 'center', borderRadius: 'var(--radius-lg)' }}>
+            <div style={{ fontSize: '48px', marginBottom: '16px' }}>🎉</div>
+            <h3 style={{ fontSize: '20px', marginBottom: '12px' }}>학습 1회독 완료!</h3>
+            
+            {learningCount > 0 ? (
+              <>
+                <p style={{ color: 'var(--text-secondary)', marginBottom: '24px', lineHeight: '1.5' }}>
+                  수고하셨습니다!<br/>
+                  아직 외우지 못한 단어가 <strong style={{color: 'var(--accent-primary)'}}>{learningCount}개</strong> 남았습니다.
+                </p>
+                <button 
+                  onClick={handleShuffleRestudy}
+                  style={{
+                    background: 'var(--accent-gradient)', color: 'white', border: 'none', 
+                    padding: '14px 24px', borderRadius: 'var(--radius-full)', fontWeight: 'bold',
+                    display: 'flex', alignItems: 'center', gap: '8px', margin: '0 auto',
+                    boxShadow: 'var(--shadow-glow)', cursor: 'pointer'
+                  }}
+                >
+                  <RefreshCw size={18} />
+                  틀린 단어 셔플해서 재학습
+                </button>
+              </>
+            ) : (
+              <p style={{ color: 'var(--text-secondary)', lineHeight: '1.5' }}>
+                이 세트의 모든 단어를 완벽하게 외웠습니다!<br/>💯
+              </p>
+            )}
+          </div>
         ) : (
           <>
             <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <div style={{ width: '100%', maxWidth: '400px' }}>
+                {/* Find the current DB word to ensure UI updates if it changes behind the scenes */}
                 <WordCard 
-                  key={filteredWords[currentIndex].id} // Using key forces re-render/reset when word changes
-                  word={filteredWords[currentIndex]} 
-                  hideAll={true} // In single-card mode, it should always start hidden
+                  key={studyQueue[currentIndex].id}
+                  word={words.find(w => w.id === studyQueue[currentIndex].id) || studyQueue[currentIndex]} 
                   onToggleMastered={handleToggleMastered} 
                   onDelete={handleDeleteWord} 
                   onEdit={handleEditWord} 
@@ -224,31 +290,31 @@ export default function StudySet() {
             {/* X and O Action Buttons */}
             <div style={{ display: 'flex', justifyContent: 'center', gap: '24px', marginTop: '10px' }}>
               <button
-                onClick={() => handleToggleMastered(filteredWords[currentIndex].id, false)}
+                onClick={() => handleMark(false)}
                 style={{
                   width: '64px', height: '64px', borderRadius: '50%',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  background: !filteredWords[currentIndex].is_mastered ? 'var(--accent-danger)' : 'var(--bg-glass-strong)',
-                  color: !filteredWords[currentIndex].is_mastered ? 'white' : 'var(--text-secondary)',
-                  border: 'none', boxShadow: 'var(--shadow-sm)', transition: 'all 0.2s',
-                  opacity: filteredWords[currentIndex].is_mastered ? 0.7 : 1
+                  background: 'var(--accent-danger)',
+                  color: 'white',
+                  border: 'none', boxShadow: 'var(--shadow-md)', transition: 'all 0.2s',
+                  cursor: 'pointer'
                 }}
-                aria-label="모름"
+                aria-label="모름 (X)"
               >
                 <XIcon size={32} strokeWidth={3} />
               </button>
               
               <button
-                onClick={() => handleToggleMastered(filteredWords[currentIndex].id, true)}
+                onClick={() => handleMark(true)}
                 style={{
                   width: '64px', height: '64px', borderRadius: '50%',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  background: filteredWords[currentIndex].is_mastered ? 'var(--accent-success)' : 'var(--bg-glass-strong)',
-                  color: filteredWords[currentIndex].is_mastered ? 'white' : 'var(--text-secondary)',
-                  border: 'none', boxShadow: 'var(--shadow-sm)', transition: 'all 0.2s',
-                  opacity: !filteredWords[currentIndex].is_mastered ? 0.7 : 1
+                  background: 'var(--accent-success)',
+                  color: 'white',
+                  border: 'none', boxShadow: 'var(--shadow-md)', transition: 'all 0.2s',
+                  cursor: 'pointer'
                 }}
-                aria-label="암기 완료"
+                aria-label="암기 완료 (O)"
               >
                 <CircleIcon size={28} strokeWidth={4} />
               </button>
@@ -265,14 +331,14 @@ export default function StudySet() {
               </button>
               
               <div style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>
-                {currentIndex + 1} / {filteredWords.length}
+                {currentIndex + 1} / {studyQueue.length}
               </div>
               
               <button 
                 className="icon-btn" 
                 onClick={handleNext} 
-                disabled={currentIndex === filteredWords.length - 1}
-                style={{ opacity: currentIndex === filteredWords.length - 1 ? 0.3 : 1, cursor: currentIndex === filteredWords.length - 1 ? 'default' : 'pointer' }}
+                disabled={currentIndex === studyQueue.length - 1}
+                style={{ opacity: currentIndex === studyQueue.length - 1 ? 0.3 : 1, cursor: currentIndex === studyQueue.length - 1 ? 'default' : 'pointer' }}
               >
                 <ChevronRight size={24} />
               </button>

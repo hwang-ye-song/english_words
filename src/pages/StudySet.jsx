@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Plus, ChevronLeft, ChevronRight } from 'lucide-react';
+import { ArrowLeft, Plus, ChevronLeft, ChevronRight, X as XIcon, Circle as CircleIcon } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
 import { useAuth } from '../contexts/AuthContext';
 import WordCard from '../components/WordCard';
@@ -219,6 +219,39 @@ export default function StudySet() {
                   onEdit={handleEditWord} 
                 />
               </div>
+            </div>
+
+            {/* X and O Action Buttons */}
+            <div style={{ display: 'flex', justifyContent: 'center', gap: '24px', marginTop: '10px' }}>
+              <button
+                onClick={() => handleToggleMastered(filteredWords[currentIndex].id, false)}
+                style={{
+                  width: '64px', height: '64px', borderRadius: '50%',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  background: !filteredWords[currentIndex].is_mastered ? 'var(--accent-danger)' : 'var(--bg-glass-strong)',
+                  color: !filteredWords[currentIndex].is_mastered ? 'white' : 'var(--text-secondary)',
+                  border: 'none', boxShadow: 'var(--shadow-sm)', transition: 'all 0.2s',
+                  opacity: filteredWords[currentIndex].is_mastered ? 0.7 : 1
+                }}
+                aria-label="모름"
+              >
+                <XIcon size={32} strokeWidth={3} />
+              </button>
+              
+              <button
+                onClick={() => handleToggleMastered(filteredWords[currentIndex].id, true)}
+                style={{
+                  width: '64px', height: '64px', borderRadius: '50%',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  background: filteredWords[currentIndex].is_mastered ? 'var(--accent-success)' : 'var(--bg-glass-strong)',
+                  color: filteredWords[currentIndex].is_mastered ? 'white' : 'var(--text-secondary)',
+                  border: 'none', boxShadow: 'var(--shadow-sm)', transition: 'all 0.2s',
+                  opacity: !filteredWords[currentIndex].is_mastered ? 0.7 : 1
+                }}
+                aria-label="암기 완료"
+              >
+                <CircleIcon size={28} strokeWidth={4} />
+              </button>
             </div>
 
             <div className="flashcard-nav" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0' }}>

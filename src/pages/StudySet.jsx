@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Plus, EyeOff, Eye } from 'lucide-react';
+import { ArrowLeft, Plus, ChevronLeft, ChevronRight } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
 import { useAuth } from '../contexts/AuthContext';
 import WordCard from '../components/WordCard';
@@ -16,7 +16,7 @@ export default function StudySet() {
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [editWord, setEditWord] = useState(null);
-  const [hideAll, setHideAll] = useState(false);
+  const [currentIndex, setCurrentIndex] = useState(0);
   const [filter, setFilter] = useState('all');
   const [toast, setToast] = useState(null);
 
@@ -124,6 +124,21 @@ export default function StudySet() {
     return true;
   });
 
+  // Ensure currentIndex is valid if filteredWords changes
+  useEffect(() => {
+    if (currentIndex >= filteredWords.length && filteredWords.length > 0) {
+      setCurrentIndex(filteredWords.length - 1);
+    }
+  }, [filteredWords.length, currentIndex]);
+
+  const handlePrev = () => {
+    if (currentIndex > 0) setCurrentIndex(currentIndex - 1);
+  };
+
+  const handleNext = () => {
+    if (currentIndex < filteredWords.length - 1) setCurrentIndex(currentIndex + 1);
+  };
+
   const learningCount = words.filter(w => !w.is_mastered).length;
   const masteredCount = words.filter(w => w.is_mastered).length;
 
@@ -183,26 +198,53 @@ export default function StudySet() {
         </button>
       </div>
 
-      <div className="hide-all-toggle">
-        <button className={`hide-all-btn ${hideAll ? 'active' : ''}`} onClick={() => setHideAll(!hideAll)}>
-          {hideAll ? <EyeOff size={14} /> : <Eye size={14} />}
-          {hideAll ? '뜻 가리기 ON' : '뜻 가리기 OFF'}
-        </button>
-      </div>
-
-      <div className="word-list">
+      {/* Navigation and Single Flashcard View */}
+      <div className="flashcard-container" style={{ padding: '0 20px', flex: 1, display: 'flex', flexDirection: 'column', gap: '20px', alignItems: 'stretch' }}>
         {filteredWords.length === 0 ? (
-          <div className="word-list-empty">
+          <div className="word-list-empty" style={{ margin: 'auto' }}>
             <div className="word-list-empty-icon">📝</div>
             <h3>단어가 없습니다</h3>
-            <p>아래 + 버튼을 눌러 단어를 추가해 보세요!</p>
+            <p>조건에 맞는 단어가 없거나 비어 있습니다.</p>
           </div>
         ) : (
-          filteredWords.map((word, index) => (
-            <div key={word.id} style={{ animationDelay: `${index * 0.05}s` }}>
-              <WordCard word={word} hideAll={hideAll} onToggleMastered={handleToggleMastered} onDelete={handleDeleteWord} onEdit={handleEditWord} />
+          <>
+            <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <div style={{ width: '100%', maxWidth: '400px' }}>
+                <WordCard 
+                  key={filteredWords[currentIndex].id} // Using key forces re-render/reset when word changes
+                  word={filteredWords[currentIndex]} 
+                  hideAll={true} // In single-card mode, it should always start hidden
+                  onToggleMastered={handleToggleMastered} 
+                  onDelete={handleDeleteWord} 
+                  onEdit={handleEditWord} 
+                />
+              </div>
             </div>
-          ))
+
+            <div className="flashcard-nav" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0' }}>
+              <button 
+                className="icon-btn" 
+                onClick={handlePrev} 
+                disabled={currentIndex === 0}
+                style={{ opacity: currentIndex === 0 ? 0.3 : 1, cursor: currentIndex === 0 ? 'default' : 'pointer' }}
+              >
+                <ChevronLeft size={24} />
+              </button>
+              
+              <div style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>
+                {currentIndex + 1} / {filteredWords.length}
+              </div>
+              
+              <button 
+                className="icon-btn" 
+                onClick={handleNext} 
+                disabled={currentIndex === filteredWords.length - 1}
+                style={{ opacity: currentIndex === filteredWords.length - 1 ? 0.3 : 1, cursor: currentIndex === filteredWords.length - 1 ? 'default' : 'pointer' }}
+              >
+                <ChevronRight size={24} />
+              </button>
+            </div>
+          </>
         )}
       </div>
 

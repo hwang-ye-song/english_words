@@ -1,14 +1,11 @@
 import { useState } from 'react';
-import { Check, Volume2, Eye, EyeOff, Pencil, Trash2, Lightbulb, ChevronDown, ChevronUp } from 'lucide-react';
+import { Check, Volume2, Pencil, Trash2, Lightbulb } from 'lucide-react';
 import seedWords from '../data/seedWords.json';
 
-export default function WordCard({ word, onToggleMastered, onDelete, onEdit, hideAll }) {
-  const [showMeaning, setShowMeaning] = useState(!hideAll);
-  const [speaking, setSpeaking] = useState(false);
+export default function WordCard({ word, onToggleMastered, onDelete, onEdit }) {
   const [expanded, setExpanded] = useState(false);
+  const [speaking, setSpeaking] = useState(false);
 
-  const isMeaningVisible = hideAll ? showMeaning : true;
-  
   const localWordInfo = seedWords.find(w => w.english === word.english);
   const localExample = localWordInfo?.example;
   const localExampleTranslation = localWordInfo?.example_translation;
@@ -30,18 +27,7 @@ export default function WordCard({ word, onToggleMastered, onDelete, onEdit, hid
     }
   };
 
-  const handleToggleMeaning = (e) => {
-    e.stopPropagation();
-    setShowMeaning(!showMeaning);
-  };
-
   const handleCardClick = () => {
-    // If meaning is hidden due to hideAll, first click reveals meaning
-    if (hideAll && !isMeaningVisible) {
-      setShowMeaning(true);
-      return;
-    }
-    // Otherwise toggle expanded state
     setExpanded(!expanded);
   };
 
@@ -49,94 +35,95 @@ export default function WordCard({ word, onToggleMastered, onDelete, onEdit, hid
     <div 
       className={`word-card glass ${word.is_mastered ? 'mastered' : ''}`}
       onClick={handleCardClick}
-      style={{ cursor: 'pointer', padding: '20px 20px 12px 20px', display: 'flex', flexDirection: 'column' }}
+      style={{ 
+        cursor: 'pointer', 
+        padding: '30px', 
+        display: 'flex', 
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        minHeight: '350px',
+        textAlign: 'center',
+        position: 'relative',
+        boxShadow: 'var(--shadow-md)',
+        transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
+      }}
     >
-      <div className="word-card-main">
-        <div className="word-check" onClick={(e) => e.stopPropagation()}>
+      {/* Top Left: Check Button */}
+      <div style={{ position: 'absolute', top: '16px', left: '16px' }}>
           <button
             className={`word-check-btn ${word.is_mastered ? 'checked' : ''}`}
-            onClick={() => onToggleMastered(word.id, !word.is_mastered)}
+            onClick={(e) => { e.stopPropagation(); onToggleMastered(word.id, !word.is_mastered); }}
             aria-label={word.is_mastered ? '암기 완료 해제' : '암기 완료'}
           >
             {word.is_mastered && <Check size={14} strokeWidth={3} />}
           </button>
-        </div>
+      </div>
 
-        <div className="word-content" style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-          <div className="word-english" style={{ fontSize: '22px', fontWeight: '800', display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '2px' }}>
-            <span>{word.english}</span>
-            <button
-              className={`speak-btn ${speaking ? 'speaking' : ''}`}
-              onClick={handleSpeak}
-              aria-label="발음 듣기"
-            >
-              <Volume2 size={16} />
-            </button>
-          </div>
-
-          <div
-            className={`word-korean ${!isMeaningVisible && hideAll ? 'hidden' : ''}`}
-            style={{ fontSize: '16px', fontWeight: '500', color: 'var(--text-secondary)' }}
-          >
-            {word.korean}
-          </div>
-
-          {/* Expanded Content (Flashcard Back) */}
-          {expanded && isMeaningVisible && (
-            <div className="word-expanded-content animate-fade-in" style={{ marginTop: '16px', borderTop: '1px solid var(--border-color)', paddingTop: '16px' }}>
-              {word.pronunciation && (
-                <div className="word-pronunciation" style={{ marginBottom: '10px', fontSize: '14px' }}>
-                  🗣 {word.pronunciation}
-                </div>
-              )}
-              
-              {word.memo_tip && (
-                <div className="word-tip" style={{ marginBottom: '12px' }}>
-                  <Lightbulb size={14} />
-                  {word.memo_tip}
-                </div>
-              )}
-
-              {localExample && (
-                <div className="word-example" style={{ fontSize: '14.5px', color: 'var(--text-primary)', fontStyle: 'italic', background: 'var(--bg-input)', padding: '12px', borderRadius: '10px', lineHeight: '1.5' }}>
-                  <div style={{ fontWeight: 700, fontSize: '12px', color: 'var(--accent-primary)', marginBottom: '6px', fontStyle: 'normal' }}>📖 필수 예문</div>
-                  <div style={{ marginBottom: '4px' }}>{localExample}</div>
-                  <div style={{ fontStyle: 'normal', color: 'var(--text-secondary)', fontSize: '13.5px' }}>{localExampleTranslation}</div>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-
-        <div className="word-actions" onClick={(e) => e.stopPropagation()}>
-          <button
-            className={`word-action-btn ${hideAll ? 'toggle-active' : ''}`}
-            onClick={handleToggleMeaning}
-            aria-label="뜻 토글"
-          >
-            {isMeaningVisible || !hideAll ? <Eye size={18} /> : <EyeOff size={18} />}
-          </button>
-          <button
+      {/* Top Right: Edit/Delete Actions */}
+      <div style={{ position: 'absolute', top: '16px', right: '16px', display: 'flex', gap: '8px' }}>
+         <button
             className="word-action-btn"
-            onClick={() => onEdit(word)}
+            onClick={(e) => { e.stopPropagation(); onEdit(word); }}
             aria-label="수정"
           >
             <Pencil size={18} />
           </button>
           <button
             className="word-action-btn delete"
-            onClick={() => onDelete(word.id)}
+            onClick={(e) => { e.stopPropagation(); onDelete(word.id); }}
             aria-label="삭제"
           >
             <Trash2 size={18} />
           </button>
-        </div>
       </div>
-      
-      {/* Expand Indicator */}
-      {isMeaningVisible && (
-        <div style={{ textAlign: 'center', marginTop: '12px', color: 'var(--text-tertiary)', opacity: 0.4, display: 'flex', justifyContent: 'center' }}>
-          {expanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+
+      {/* Front of Card: English Word */}
+      <div className="word-english" style={{ fontSize: '36px', fontWeight: '800', display: 'flex', alignItems: 'center', gap: '12px', marginTop: expanded ? '20px' : '0' }}>
+        <span>{word.english}</span>
+        <button
+          className={`speak-btn ${speaking ? 'speaking' : ''}`}
+          onClick={handleSpeak}
+          aria-label="발음 듣기"
+        >
+          <Volume2 size={24} />
+        </button>
+      </div>
+
+      {!expanded && (
+        <div style={{ color: 'var(--text-tertiary)', fontSize: '15px', marginTop: '30px', animation: 'fadeIn 0.5s ease', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
+          <span style={{ fontSize: '24px' }}>👆</span>
+          <span>카드를 터치해서 뒤집기</span>
+        </div>
+      )}
+
+      {/* Back of Card: Meaning, Tip, Example */}
+      {expanded && (
+        <div className="word-expanded-content animate-fade-in" style={{ width: '100%', marginTop: '24px', paddingTop: '24px', borderTop: '1px dashed var(--border-color)' }}>
+          <div className="word-korean" style={{ fontSize: '22px', fontWeight: '700', color: 'var(--text-primary)', marginBottom: '12px' }}>
+            {word.korean}
+          </div>
+
+          {word.pronunciation && (
+            <div className="word-pronunciation" style={{ marginBottom: '16px', fontSize: '15px', color: 'var(--text-secondary)' }}>
+              🗣 {word.pronunciation}
+            </div>
+          )}
+          
+          {word.memo_tip && (
+            <div className="word-tip" style={{ marginBottom: '20px', justifyContent: 'center', padding: '10px' }}>
+              <Lightbulb size={16} />
+              {word.memo_tip}
+            </div>
+          )}
+
+          {localExample && (
+            <div className="word-example" style={{ fontSize: '15px', color: 'var(--text-primary)', fontStyle: 'italic', background: 'var(--bg-input)', padding: '16px', borderRadius: '12px', lineHeight: '1.6', textAlign: 'left' }}>
+              <div style={{ fontWeight: 700, fontSize: '13px', color: 'var(--accent-primary)', marginBottom: '8px', fontStyle: 'normal' }}>📖 필수 예문</div>
+              <div style={{ marginBottom: '6px' }}>{localExample}</div>
+              <div style={{ fontStyle: 'normal', color: 'var(--text-secondary)', fontSize: '14px' }}>{localExampleTranslation}</div>
+            </div>
+          )}
         </div>
       )}
     </div>

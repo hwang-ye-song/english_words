@@ -1,16 +1,14 @@
-# React + Vite
+# 나만의 커스텀 영단어 학습 어플
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+영어 공부를 하고 싶은데 돈은 쓰기 싫어서 이전에 홈페이지 만들때 사용했던 도구 가지고 저만의 영어 학습 어플을 만들어봤습니다.  
+DB는 슈퍼베이스(Supabase)를 사용했고, 개발은 안티그래비티(Antigravity)를 사용했습니다.
 
-Currently, two official plugins are available:
+## 기능 소개
+- 단어 학습 시 Notebook LM 느낌의 플래시 카드 기능을 사용하게 만들었습니다.
+- 단어는 깃허브에서 2480단어 리스트를 뽑고, LLM을 활용해서 필수 예문을 추가했습니다. (각각 200단어씩 처리하는 LLM 13개를 가동한 후 결과만 병합)
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
-
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the Oxlint configuration
-
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and Oxlint's TypeScript related rules in your project.
+## 개발 과정
+- 기존 엑셀 데이터를 JSON으로 변환하여 데이터 세팅
+- Supabase 연결로 사용자 인증 및 단어 Set 기능 연동
+- Antigravity를 통한 프론트엔드 UI/UX (플래시 카드 등) 전면 구현
+- 멀티 LLM 병렬 처리를 통해 2,480개 단어 예문/해석 완전 자동화 구축

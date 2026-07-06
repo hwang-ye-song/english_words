@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { ArrowLeft, Plus, ChevronLeft, ChevronRight, X as XIcon, Circle as CircleIcon, RefreshCw } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
 import { useAuth } from '../contexts/AuthContext';
@@ -11,6 +11,7 @@ export default function StudySet() {
   const decodedSetName = decodeURIComponent(setName);
   const { user } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const [words, setWords] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -27,19 +28,31 @@ export default function StudySet() {
 
   const loadWords = useCallback(async () => {
     if (!user) return;
-    const { data, error } = await supabase
-      .from('words')
-      .select('*')
-      .eq('user_id', user.id)
-      .eq('set_name', decodedSetName)
-      .order('is_mastered', { ascending: true })
-      .order('created_at', { ascending: false });
+    
+    let query = supabase.from('words').select('*').eq('user_id', user.id);
+    
+    if (decodedSetName !== 'random') {
+      query = query
+        .eq('set_name', decodedSetName)
+        .order('is_mastered', { ascending: true })
+        .order('created_at', { ascending: false });
+    }
+
+    const { data, error } = await query;
 
     if (!error && data) {
-      setWords(data);
+      if (decodedSetName === 'random') {
+        const countParam = new URLSearchParams(location.search).get('count');
+        const count = countParam ? parseInt(countParam, 10) : 10;
+        // Shuffle and slice
+        const shuffled = [...data].sort(() => 0.5 - Math.random());
+        setWords(shuffled.slice(0, count));
+      } else {
+        setWords(data);
+      }
     }
     setLoading(false);
-  }, [user, decodedSetName]);
+  }, [user, decodedSetName, location.search]);
 
   useEffect(() => {
     loadWords();
@@ -50,15 +63,13 @@ export default function StudySet() {
     setTimeout(() => setToast(null), 2500);
   };
 
-  // Build the queue when filter changes or on initial load
+  // Build the queue on initial load only
   useEffect(() => {
-    if (words.length > 0) {
+    if (words.length > 0 && studyQueue.length === 0) {
       startRound(filter);
-    } else {
-      setStudyQueue([]);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filter, words.length]); // Don't trigger when `words` objects mutate (e.g. is_mastered flips)
+  }, [words.length]); // Only run when words are first loaded
 
   const startRound = (targetFilter, customQueue = null) => {
     setIsRoundComplete(false);
@@ -195,7 +206,9 @@ export default function StudySet() {
           <ArrowLeft size={20} />
         </button>
         <div className="header-left">
-          <h2 style={{ fontSize: '1.2rem', margin: 0 }}>{decodedSetName}</h2>
+          <h2 style={{ fontSize: '1.2rem', margin: 0 }}>
+            {decodedSetName === 'random' ? '🔥 전체 랜덤 복습' : decodedSetName}
+          </h2>
           <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
             총 {words.length}단어
           </p>
@@ -253,23 +266,49 @@ export default function StudySet() {
                   수고하셨습니다!<br/>
                   아직 외우지 못한 단어가 <strong style={{color: 'var(--accent-primary)'}}>{learningCount}개</strong> 남았습니다.
                 </p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', alignItems: 'center' }}>
+                  <button 
+                    onClick={handleShuffleRestudy}
+                    style={{
+                      background: 'var(--accent-gradient)', color: 'white', border: 'none', 
+                      padding: '14px 24px', borderRadius: 'var(--radius-full)', fontWeight: 'bold',
+                      display: 'flex', alignItems: 'center', gap: '8px', margin: '0 auto', width: '100%', maxWidth: '240px', justifyContent: 'center',
+                      boxShadow: 'var(--shadow-glow)', cursor: 'pointer'
+                    }}
+                  >
+                    <RefreshCw size={18} />
+                    틀린 단어 셔플해서 재학습
+                  </button>
+                  <button 
+                    onClick={() => navigate('/')}
+                    style={{
+                      background: 'var(--bg-glass-strong)', color: 'var(--text-primary)', border: '1px solid var(--border-color)', 
+                      padding: '14px 24px', borderRadius: 'var(--radius-full)', fontWeight: 'bold',
+                      display: 'flex', alignItems: 'center', gap: '8px', margin: '0 auto', width: '100%', maxWidth: '240px', justifyContent: 'center',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    홈 화면으로 가기
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <p style={{ color: 'var(--text-secondary)', lineHeight: '1.5', marginBottom: '24px' }}>
+                  이 세트의 모든 단어를 완벽하게 외웠습니다!<br/>💯
+                </p>
                 <button 
-                  onClick={handleShuffleRestudy}
+                  onClick={() => navigate('/')}
                   style={{
                     background: 'var(--accent-gradient)', color: 'white', border: 'none', 
                     padding: '14px 24px', borderRadius: 'var(--radius-full)', fontWeight: 'bold',
-                    display: 'flex', alignItems: 'center', gap: '8px', margin: '0 auto',
+                    display: 'flex', alignItems: 'center', gap: '8px', margin: '0 auto', width: '100%', maxWidth: '240px', justifyContent: 'center',
                     boxShadow: 'var(--shadow-glow)', cursor: 'pointer'
                   }}
                 >
-                  <RefreshCw size={18} />
-                  틀린 단어 셔플해서 재학습
+                  홈 화면으로 가기
                 </button>
               </>
-            ) : (
-              <p style={{ color: 'var(--text-secondary)', lineHeight: '1.5' }}>
-                이 세트의 모든 단어를 완벽하게 외웠습니다!<br/>💯
-              </p>
             )}
           </div>
         ) : (

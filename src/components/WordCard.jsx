@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Check, Volume2, Pencil, Trash2, Lightbulb } from 'lucide-react';
 import seedWords from '../data/seedWords.json';
 
@@ -11,7 +11,7 @@ export default function WordCard({ word, onToggleMastered, onDelete, onEdit }) {
   const localExampleTranslation = localWordInfo?.example_translation;
 
   const handleSpeak = (e) => {
-    e.stopPropagation();
+    if (e) e.stopPropagation();
     if ('speechSynthesis' in window) {
       window.speechSynthesis.cancel();
       const utterance = new SpeechSynthesisUtterance(word.english);
@@ -27,13 +27,23 @@ export default function WordCard({ word, onToggleMastered, onDelete, onEdit }) {
     }
   };
 
+  useEffect(() => {
+    handleSpeak();
+    return () => {
+      if ('speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+      }
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const handleCardClick = () => {
     setExpanded(!expanded);
   };
 
   return (
     <div 
-      className={`word-card glass ${word.is_mastered ? 'mastered' : ''}`}
+      className="word-card glass"
       onClick={handleCardClick}
       style={{ 
         cursor: 'pointer', 
@@ -49,17 +59,6 @@ export default function WordCard({ word, onToggleMastered, onDelete, onEdit }) {
         transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
       }}
     >
-      {/* Top Left: Check Button */}
-      <div style={{ position: 'absolute', top: '16px', left: '16px' }}>
-          <button
-            className={`word-check-btn ${word.is_mastered ? 'checked' : ''}`}
-            onClick={(e) => { e.stopPropagation(); onToggleMastered(word.id, !word.is_mastered); }}
-            aria-label={word.is_mastered ? '암기 완료 해제' : '암기 완료'}
-          >
-            {word.is_mastered && <Check size={14} strokeWidth={3} />}
-          </button>
-      </div>
-
       {/* Top Right: Edit/Delete Actions */}
       <div style={{ position: 'absolute', top: '16px', right: '16px', display: 'flex', gap: '8px' }}>
          <button

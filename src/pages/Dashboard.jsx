@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Settings, Moon, Sun, Plus, BookOpen } from 'lucide-react';
+import { Settings, Moon, Sun, Plus, BookOpen, Pencil, Trash2 } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
@@ -17,6 +17,8 @@ export default function Dashboard() {
   const [importing, setImporting] = useState(false);
   const [dailyGoal, setDailyGoal] = useState(10);
   const [todayMastered, setTodayMastered] = useState(0);
+  const [totalWordsCount, setTotalWordsCount] = useState(0);
+  const [randomReviewCount, setRandomReviewCount] = useState(10);
   const [toast, setToast] = useState(null);
 
   // Load words and group into sets
@@ -51,11 +53,13 @@ export default function Dashboard() {
       const sortedSets = Object.values(grouped).sort((a, b) => {
         const numA = parseInt(a.name.replace(/[^0-9]/g, '')) || 0;
         const numB = parseInt(b.name.replace(/[^0-9]/g, '')) || 0;
-        return numA - numB;
+        return numB - numA;
       });
 
       setSets(sortedSets);
       setTodayMastered(todayCount);
+      setTotalWordsCount(words.length);
+      setRandomReviewCount(Math.min(10, words.length));
     }
     setLoading(false);
   }, [user]);
@@ -146,6 +150,47 @@ export default function Dashboard() {
     }
   };
 
+  const handleRenameSet = async (e, oldName) => {
+    e.stopPropagation();
+    const newName = window.prompt(`'${oldName}'의 새 이름을 입력하세요:`, oldName);
+    if (!newName || newName.trim() === '' || newName === oldName) return;
+
+    try {
+      const { error } = await supabase
+        .from('words')
+        .update({ set_name: newName.trim() })
+        .eq('user_id', user.id)
+        .eq('set_name', oldName);
+
+      if (error) throw error;
+      showToast(`단어장 이름이 '${newName}'(으)로 변경되었습니다.`);
+      loadData();
+    } catch (err) {
+      console.error('Failed to rename set:', err);
+      alert('이름 변경 중 오류가 발생했습니다.');
+    }
+  };
+
+  const handleDeleteSet = async (e, setName) => {
+    e.stopPropagation();
+    if (!window.confirm(`정말로 '${setName}' 단어장을 삭제하시겠습니까?\n이 단어장 안에 있는 모든 단어 기록이 영구적으로 삭제됩니다.`)) return;
+
+    try {
+      const { error } = await supabase
+        .from('words')
+        .delete()
+        .eq('user_id', user.id)
+        .eq('set_name', setName);
+
+      if (error) throw error;
+      showToast(`'${setName}' 단어장이 삭제되었습니다.`, 'error');
+      loadData();
+    } catch (err) {
+      console.error('Failed to delete set:', err);
+      alert('단어장 삭제 중 오류가 발생했습니다.');
+    }
+  };
+
   const getGreeting = () => {
     const hour = new Date().getHours();
     if (hour < 6) return '늦은 밤까지 화이팅! 🌙';
@@ -163,7 +208,7 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="dashboard">
+    <div className="dashboard" style={{ height: '100dvh', overflow: 'hidden', paddingBottom: 'calc(24px + env(safe-area-inset-bottom, 0px))' }}>
       {toast && (
         <div className={`toast ${toast.type}`}>{toast.message}</div>
       )}
@@ -188,40 +233,74 @@ export default function Dashboard() {
       <ProgressBar current={todayMastered} goal={dailyGoal} />
 
       {/* Sets List */}
-      <div className="set-list" style={{ marginTop: '24px', padding: '0 20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-        <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 600 }}>내 단어장</h3>
+      <div className="set-list" style={{ flex: 1, minHeight: 0, marginTop: '4px', padding: '0 20px', display: 'flex', flexDirection: 'column' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px', flexShrink: 0 }}>
+          <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 600 }}>내 단어장</h3>
+          <button 
+            onClick={handleCreateSet}
+            disabled={importing}
+            style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
+              padding: '6px 14px', borderRadius: '8px',
+              background: 'var(--bg-glass-strong)', border: '1px solid var(--border-color)',
+              color: 'var(--text-primary)', cursor: 'pointer', fontSize: '0.85rem', fontWeight: 600,
+              opacity: importing ? 0.7 : 1, transition: 'all 0.2s'
+            }}
+            aria-label="단어장 세트 생성"
+          >
+            <Plus size={16} style={{ animation: importing ? 'spin 1s linear infinite' : 'none' }} />
+            단어장 생성
+          </button>
+        </div>
         
-        {sets.length === 0 ? (
-          <div className="word-list-empty" style={{ marginTop: '20px' }}>
-            <div className="word-list-empty-icon">📚</div>
-            <h3>단어장이 비어있어요</h3>
-            <p>우측 하단의 + 버튼을 눌러<br/>첫 번째 단어장 세트를 생성해 보세요!</p>
-          </div>
-        ) : (
+        <div style={{ flex: 1, overflowY: 'auto', scrollbarWidth: 'thin', display: 'flex', flexDirection: 'column', gap: '10px', paddingRight: '4px' }}>
+          {sets.length === 0 ? (
+            <div className="word-list-empty">
+              <div className="word-list-empty-icon">📚</div>
+              <h3>단어장이 비어있어요</h3>
+              <p>우측 하단의 + 버튼을 눌러<br/>첫 번째 단어장 세트를 생성해 보세요!</p>
+            </div>
+          ) : (
           sets.map((set, idx) => (
             <div 
               key={set.name} 
               className="settings-card glass" 
-              style={{ padding: '20px', cursor: 'pointer', animationDelay: `${idx * 0.1}s` }}
+              style={{ padding: '12px 16px', cursor: 'pointer', flexShrink: 0, animationDelay: `${idx * 0.1}s` }}
               onClick={() => navigate(`/set/${encodeURIComponent(set.name)}`)}
             >
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  <div className="settings-item-icon blue">
-                    <BookOpen size={20} />
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <div className="settings-item-icon blue" style={{ width: '32px', height: '32px' }}>
+                    <BookOpen size={16} />
                   </div>
-                  <h4 style={{ margin: 0, fontSize: '1.1rem' }}>{set.name}</h4>
+                  <h4 style={{ margin: 0, fontSize: '1rem' }}>{set.name}</h4>
+                  <div style={{ display: 'flex', gap: '2px', marginLeft: '6px' }}>
+                    <button 
+                      onClick={(e) => handleRenameSet(e, set.name)}
+                      style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', padding: '4px' }}
+                      aria-label="이름 변경"
+                    >
+                      <Pencil size={14} />
+                    </button>
+                    <button 
+                      onClick={(e) => handleDeleteSet(e, set.name)}
+                      style={{ background: 'none', border: 'none', color: 'var(--accent-danger)', cursor: 'pointer', padding: '4px' }}
+                      aria-label="삭제"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
                 </div>
-                <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontWeight: 500 }}>
+                <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: 500 }}>
                   {set.mastered} / {set.total}
                 </span>
               </div>
-              <div className="progress-bar-bg" style={{ height: '6px', borderRadius: '3px', background: 'var(--glass-border)' }}>
+              <div className="progress-bar-bg" style={{ height: '4px', borderRadius: '2px', background: 'var(--glass-border)' }}>
                 <div 
                   className="progress-bar-fill" 
                   style={{ 
                     height: '100%', 
-                    borderRadius: '3px', 
+                    borderRadius: '2px', 
                     background: set.mastered === set.total && set.total > 0 
                       ? 'var(--success)' 
                       : 'linear-gradient(90deg, var(--primary), var(--secondary))',
@@ -233,23 +312,51 @@ export default function Dashboard() {
             </div>
           ))
         )}
+        </div>
       </div>
 
-      {/* Daily Note */}
-      <div style={{ marginTop: '24px' }}>
-        <DailyNote />
-      </div>
+      {/* Global Random Review */}
+      {totalWordsCount > 0 && (
+        <div style={{ padding: '16px 20px 0', flexShrink: 0 }}>
+          <div className="settings-card glass" style={{ padding: '20px' }}>
+            <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}>
+              🔥 전체 랜덤 복습
+            </h3>
+            <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '8px', marginBottom: '16px' }}>
+              지금까지 저장된 {totalWordsCount}개의 단어 중 몇 개를 복습할까요?
+            </p>
+            <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+              <input 
+                type="number" 
+                min="1" 
+                max={totalWordsCount} 
+                value={randomReviewCount}
+                onChange={(e) => setRandomReviewCount(Number(e.target.value))}
+                style={{
+                  background: 'var(--bg-input)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)',
+                  padding: '12px', color: 'var(--text-primary)', fontSize: '16px', width: '80px', textAlign: 'center', fontWeight: 'bold'
+                }}
+              />
+              <button
+                onClick={() => {
+                  let count = randomReviewCount;
+                  if (count < 1) count = 1;
+                  if (count > totalWordsCount) count = totalWordsCount;
+                  navigate(`/set/random?count=${count}`);
+                }}
+                style={{
+                  flex: 1, background: 'var(--accent-gradient)', color: 'white', border: 'none', 
+                  padding: '12px', borderRadius: 'var(--radius-md)', fontWeight: 'bold',
+                  boxShadow: 'var(--shadow-glow)', cursor: 'pointer'
+                }}
+              >
+                랜덤 복습 시작
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
-      {/* FAB - Create New Set */}
-      <button 
-        className={`fab ${importing ? 'loading' : ''}`} 
-        onClick={handleCreateSet} 
-        aria-label="단어장 세트 생성"
-        disabled={importing}
-        style={{ opacity: importing ? 0.7 : 1 }}
-      >
-        <Plus size={24} style={{ animation: importing ? 'spin 1s linear infinite' : 'none' }} />
-      </button>
 
     </div>
   );

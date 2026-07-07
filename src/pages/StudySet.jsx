@@ -89,8 +89,11 @@ export default function StudySet() {
   };
 
   const handleShuffleRestudy = () => {
-    const unmastered = words.filter(w => !w.is_mastered);
-    const shuffled = [...unmastered].sort(() => Math.random() - 0.5);
+    const unmasteredInRound = studyQueue
+      .map(sq => words.find(w => w.id === sq.id))
+      .filter(w => w && !w.is_mastered);
+      
+    const shuffled = [...unmasteredInRound].sort(() => Math.random() - 0.5);
     setFilter('learning');
     startRound('learning', shuffled);
   };
@@ -189,6 +192,16 @@ export default function StudySet() {
   const learningCount = words.filter(w => !w.is_mastered).length;
   const masteredCount = words.filter(w => w.is_mastered).length;
 
+  const roundProcessed = studyQueue.slice(0, currentIndex);
+  const currentRoundCorrect = roundProcessed.filter(sq => {
+    const w = words.find(w => w.id === sq.id);
+    return w && w.is_mastered;
+  }).length;
+  const currentRoundIncorrect = roundProcessed.filter(sq => {
+    const w = words.find(w => w.id === sq.id);
+    return w && !w.is_mastered;
+  }).length;
+
   if (loading) {
     return (
       <div className="loading-screen">
@@ -235,16 +248,30 @@ export default function StudySet() {
         </div>
       </div>
 
-      <div className="filter-tabs">
-        <button className={`filter-tab ${filter === 'all' ? 'active' : ''}`} onClick={() => setFilter('all')}>
-          전체 <span className="count">{words.length}</span>
-        </button>
-        <button className={`filter-tab ${filter === 'learning' ? 'active' : ''}`} onClick={() => setFilter('learning')}>
-          학습 중 <span className="count">{learningCount}</span>
-        </button>
-        <button className={`filter-tab ${filter === 'mastered' ? 'active' : ''}`} onClick={() => setFilter('mastered')}>
-          완료 <span className="count">{masteredCount}</span>
-        </button>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 20px', marginBottom: '20px' }}>
+        <div className="filter-tabs" style={{ padding: 0, margin: 0, flex: 1, marginBottom: 0 }}>
+          <button className={`filter-tab ${filter === 'all' ? 'active' : ''}`} onClick={() => setFilter('all')}>
+            전체 <span className="count">{words.length}</span>
+          </button>
+          <button className={`filter-tab ${filter === 'learning' ? 'active' : ''}`} onClick={() => setFilter('learning')}>
+            학습 중 <span className="count">{learningCount}</span>
+          </button>
+          <button className={`filter-tab ${filter === 'mastered' ? 'active' : ''}`} onClick={() => setFilter('mastered')}>
+            완료 <span className="count">{masteredCount}</span>
+          </button>
+        </div>
+        
+        {!isRoundComplete && studyQueue.length > 0 && (
+          <div style={{ display: 'flex', gap: '12px', background: 'var(--bg-glass-strong)', padding: '6px 12px', borderRadius: '20px', marginLeft: '10px', boxShadow: 'var(--shadow-sm)', border: '1px solid var(--border-color)', flexShrink: 0 }}>
+            <div style={{ color: 'var(--accent-success)', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '14px', fontWeight: 'bold' }}>
+              O {currentRoundCorrect}
+            </div>
+            <div style={{ width: '1px', background: 'var(--border-color)' }}></div>
+            <div style={{ color: 'var(--accent-danger)', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '14px', fontWeight: 'bold' }}>
+              X {currentRoundIncorrect}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Navigation and Single Flashcard View */}
@@ -258,13 +285,38 @@ export default function StudySet() {
         ) : isRoundComplete ? (
           <div className="word-card glass" style={{ margin: 'auto', padding: '40px 20px', textAlign: 'center', borderRadius: 'var(--radius-lg)' }}>
             <div style={{ fontSize: '48px', marginBottom: '16px' }}>🎉</div>
-            <h3 style={{ fontSize: '20px', marginBottom: '12px' }}>학습 1회독 완료!</h3>
+            <h3 style={{ fontSize: '20px', marginBottom: '16px' }}>학습 1회독 완료!</h3>
             
-            {learningCount > 0 ? (
+            <div style={{ background: 'var(--bg-input)', borderRadius: '12px', padding: '16px', marginBottom: '24px', display: 'flex', justifyContent: 'space-around', alignItems: 'center' }}>
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '4px' }}>맞은 단어</div>
+                <div style={{ fontSize: '24px', fontWeight: 'bold', color: 'var(--accent-success)' }}>
+                  {studyQueue.filter(sq => {
+                    const w = words.find(w => w.id === sq.id);
+                    return w && w.is_mastered;
+                  }).length}개
+                </div>
+              </div>
+              <div style={{ width: '1px', height: '40px', background: 'var(--border-color)' }}></div>
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '4px' }}>틀린 단어</div>
+                <div style={{ fontSize: '24px', fontWeight: 'bold', color: 'var(--accent-danger)' }}>
+                  {studyQueue.filter(sq => {
+                    const w = words.find(w => w.id === sq.id);
+                    return w && !w.is_mastered;
+                  }).length}개
+                </div>
+              </div>
+            </div>
+            
+            {studyQueue.filter(sq => {
+              const w = words.find(w => w.id === sq.id);
+              return w && !w.is_mastered;
+            }).length > 0 ? (
               <>
                 <p style={{ color: 'var(--text-secondary)', marginBottom: '24px', lineHeight: '1.5' }}>
                   수고하셨습니다!<br/>
-                  아직 외우지 못한 단어가 <strong style={{color: 'var(--accent-primary)'}}>{learningCount}개</strong> 남았습니다.
+                  틀린 단어들을 다시 한번 복습해볼까요?
                 </p>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', alignItems: 'center' }}>
                   <button 

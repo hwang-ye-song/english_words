@@ -322,6 +322,8 @@ export default function StudySet() {
                   onToggleMastered={handleToggleMastered} 
                   onDelete={handleDeleteWord} 
                   onEdit={handleEditWord} 
+                  onSwipeLeft={() => handleMark(false)}
+                  onSwipeRight={() => handleMark(true)}
                 />
               </div>
             </div>

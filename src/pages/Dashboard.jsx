@@ -89,7 +89,13 @@ export default function Dashboard() {
 
   const handleCreateSet = async () => {
     if (importing) return;
-    if (!window.confirm('새로운 단어장 세트(50단어)를 생성하시겠습니까?')) return;
+    const input = window.prompt('몇 개의 단어로 새로운 단어장을 생성하시겠습니까? (기본 50개)', '50');
+    if (input === null) return;
+    const count = parseInt(input, 10);
+    if (isNaN(count) || count <= 0) {
+      alert('올바른 숫자를 입력해주세요.');
+      return;
+    }
     
     setImporting(true);
     try {
@@ -115,6 +121,11 @@ export default function Dashboard() {
         return;
       }
 
+      const finalCount = Math.min(count, unpickedWords.length);
+      if (count > unpickedWords.length) {
+        alert(`남은 단어가 ${unpickedWords.length}개뿐입니다. 남은 ${unpickedWords.length}개의 단어로 세트를 생성합니다.`);
+      }
+
       // Determine next set name
       let nextSetNum = 1;
       existingData.forEach(row => {
@@ -123,9 +134,9 @@ export default function Dashboard() {
       });
       const newSetName = `Set ${nextSetNum}`;
 
-      // 4. Randomly pick up to 50 words
+      // 4. Randomly pick up to finalCount words
       const shuffled = [...unpickedWords].sort(() => 0.5 - Math.random());
-      const selectedWords = shuffled.slice(0, 50);
+      const selectedWords = shuffled.slice(0, finalCount);
       
       const wordsToInsert = selectedWords.map(word => ({
         user_id: user.id,
